@@ -22,37 +22,21 @@ right = LargeMotor(OUTPUT_A)
 right.duty_cycle_sp = 0
 right.command = right.COMMAND_RUN_DIRECT
 
-alpha = 0.8
 dc_gain = 1.0
-p_gain = 1
+p_gain = 1.0
 i_gain = 0.029
 d_gain = 0.049
-#dt = 30 / 1000
 dt = 250 / 1000
 
-def angle(): return gyro.value(0)       # raw angle
-def theta(): return angle() + offset    # calibrated angle
-def rate(): return gyro.value(1)        # angular velocity
-
-def calibrate():
-    global offset
-    n = 50
-    x = 0
-    for _ in range(n):
-        x += angle()
-    offset = x / n
+def rate(): return gyro.value(1)
 
 def state():
-    print("left =", left.count_per_rot, "right =", right.count_per_rot)
-    #motor_rate = (left.count_per_rot + right.count_per_rot) / 2
-    #gyro_rate = rate()
-    #return (1 - alpha) * motor_rate + alpha * gyro_rate
     return rate()
 
 def set_dc(dc):
     dc = dc * dc_gain
-    dc = max(-100, dc) if dc < 0 else min(100, dc)
-    print("dc =", dc, file=sys.stderr)
+    dc = max(-99, dc) if dc < 0 else min(99, dc)
+    print("dc = %2.0f%%" % (dc), file=sys.stderr)
     #left.duty_cycle_sp = dc
     #right.duty_cycle_sp = dc
 
@@ -62,7 +46,7 @@ def balance():
     dt_sum = 0
     n_iter = 0
 
-    while touch.is_released and theta() < 40:
+    while touch.is_released:
         start = time.time()
 
         prev_state = cur_state
@@ -72,9 +56,9 @@ def balance():
         output = p_gain * cur_state + i_gain * integral + d_gain * derivative
 
         print("cur_state =", cur_state, file=sys.stderr)
-        #print("integral =", integral, file=sys.stderr)
-        #print("derivative =", derivative, file=sys.stderr)
-        #print("output =", output, file=sys.stderr)
+        print("integral =", integral, file=sys.stderr)
+        print("derivative =", derivative, file=sys.stderr)
+        print("output =", output, file=sys.stderr)
 
         set_dc(output)
 
@@ -85,7 +69,7 @@ def balance():
         dt_sum += time.time() - start
 
     set_dc(0)
-    print("mean dt", dt_sum / n_iter, file=sys.stderr)
+    print("actual = %.2f, target = %.2f" % (dt_sum / n_iter, dt), file=sys.stderr)
 
 def main():
 #    os.system("setfont Lat15-Terminus24x12")
