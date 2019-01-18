@@ -5,8 +5,8 @@ import time
 
 # TODO: implement fast read/write
 
-from ev3dev.motor import LargeMotor, OUTPUT_A, OUTPUT_D
-from ev3dev.sensor.lego import GyroSensor, TouchSensor
+from ev3dev2.motor import LargeMotor, OUTPUT_A, OUTPUT_D
+from ev3dev2.sensor.lego import GyroSensor, TouchSensor
 
 touch = TouchSensor()
 
@@ -22,11 +22,13 @@ right = LargeMotor(OUTPUT_A)
 right.duty_cycle_sp = 0
 right.command = right.COMMAND_RUN_DIRECT
 
-alpha = 0.5     # complementary filter
-p_gain = 1.0    # proportional gain
-i_gain = 1.0    # integral gain
-d_gain = 1.0    # derivative gain
-dt = 30 / 1000  # time between updates
+alpha = 0.8
+dc_gain = 1.0
+p_gain = 1
+i_gain = 0.029
+d_gain = 0.049
+#dt = 30 / 1000
+dt = 250 / 1000
 
 def angle(): return gyro.value(0)       # raw angle
 def theta(): return angle() + offset    # calibrated angle
@@ -41,13 +43,18 @@ def calibrate():
     offset = x / n
 
 def state():
-    motor_rate = (left.degrees_per_second + right.degrees_per_second) / 2
-    return (1 - alpha) * rate() + alpha * motor_rate
+    print("left =", left.count_per_rot, "right =", right.count_per_rot)
+    #motor_rate = (left.count_per_rot + right.count_per_rot) / 2
+    #gyro_rate = rate()
+    #return (1 - alpha) * motor_rate + alpha * gyro_rate
+    return rate()
 
 def set_dc(dc):
+    dc = dc * dc_gain
     dc = max(-100, dc) if dc < 0 else min(100, dc)
-    left.duty_cycle_sp = dc
-    right.duty_cycle_sp = dc
+    print("dc =", dc, file=sys.stderr)
+    #left.duty_cycle_sp = dc
+    #right.duty_cycle_sp = dc
 
 def balance():
     cur_state = state()
@@ -62,8 +69,14 @@ def balance():
         cur_state = state()
         integral += cur_state * dt
         derivative = (cur_state - prev_state) / dt
+        output = p_gain * cur_state + i_gain * integral + d_gain * derivative
 
-        set_dc(p_gain * cur_state + i_gain * integral + d_gain * derivative)
+        print("cur_state =", cur_state, file=sys.stderr)
+        #print("integral =", integral, file=sys.stderr)
+        #print("derivative =", derivative, file=sys.stderr)
+        #print("output =", output, file=sys.stderr)
+
+        set_dc(output)
 
         while time.time() - start < dt:
             time.sleep(0.001)
@@ -72,24 +85,20 @@ def balance():
         dt_sum += time.time() - start
 
     set_dc(0)
-    print("mean dt", dt_sum / n_iter)
+    print("mean dt", dt_sum / n_iter, file=sys.stderr)
 
 def main():
-    os.system("setfont Lat15-Terminus24x12")
-    print("calibrate ready")
-    touch.wait_for_pressed()
-    touch.wait_for_released()
-    print("calibrate start")
-    calibrate()
+#    os.system("setfont Lat15-Terminus24x12")
+#    print("calibrate ready")
+#    touch.wait_for_pressed()
+#    touch.wait_for_released()
+#    print("calibrate start")
+#    calibrate()
 
-    print("balance ready")
-    touch.wait_for_pressed()
-    touch.wait_for_released()
-    print("balance start")
+#    print("balance ready")
+#    touch.wait_for_pressed()
+#    touch.wait_for_released()
+#    print("balance start")
     balance()
 
 main()
-
-
-
-
