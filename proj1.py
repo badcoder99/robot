@@ -3,6 +3,8 @@ import os
 import sys
 import time
 
+# TODO: implement fast read/write
+
 from ev3dev.motor import LargeMotor, OUTPUT_A, OUTPUT_D
 from ev3dev.sensor.lego import GyroSensor, TouchSensor
 
@@ -10,7 +12,7 @@ touch = TouchSensor()
 
 gyro = GyroSensor()
 gyro.mode = gyro.MODE_GYRO_G_A
-angle_offset = 0
+offset = 0
 
 left = LargeMotor(OUTPUT_D)
 left.duty_cycle_sp = 0
@@ -20,26 +22,23 @@ right = LargeMotor(OUTPUT_A)
 right.duty_cycle_sp = 0
 right.command = right.COMMAND_RUN_DIRECT
 
-alpha = 0.5
-p_gain = 1.0
-i_gain = 1.0
-d_gain = 1.0
-dt = 30 / 1000
+alpha = 0.5     # complementary filter
+p_gain = 1.0    # proportional gain
+i_gain = 1.0    # integral gain
+d_gain = 1.0    # derivative gain
+dt = 30 / 1000  # time between updates
 
-def angle(): return gyro.value(0)
-
-def rate(): return gyro.value(1)
+def angle(): return gyro.value(0)       # raw angle
+def theta(): return angle() + offset    # calibrated angle
+def rate(): return gyro.value(1)        # angular velocity
 
 def calibrate():
-    global angle_offset
+    global offset
     n = 50
     x = 0
     for _ in range(n):
         x += angle()
-    angle_offset = x / n
-
-def theta():
-    return angle() + angle_offset
+    offset = x / n
 
 def state():
     motor_rate = (left.degrees_per_second + right.degrees_per_second) / 2
@@ -52,28 +51,28 @@ def set_dc(dc):
 
 def balance():
     cur_state = state()
-    i_state = 0
+    integral = 0
     dt_sum = 0
-    n = 0
+    n_iter = 0
 
     while not touch.is_pressed and theta() < 40:
         start = time.time()
 
         prev_state = cur_state
         cur_state = state()
-        i_state += cur_state * dt
-        d_state = (cur_state - prev_state) / dt
+        integral += cur_state * dt
+        derivative = (cur_state - prev_state) / dt
 
-        set_dc(p_gain * cur_state + i_gain * i_state + d_gain * d_state)
+        set_dc(p_gain * cur_state + i_gain * integral + d_gain * derivative)
 
         while time.time() - start < dt:
             time.sleep(0.001)
 
-        n += 1
+        n_iter += 1
         dt_sum += time.time() - start
 
     set_dc(0)
-    print("mean dt", dt_sum / n)
+    print("mean dt", dt_sum / n_iter)
 
 def main():
     print("calibrate ready")
