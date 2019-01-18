@@ -55,7 +55,7 @@ def balance():
     dt_sum = 0
     n_iter = 0
 
-    while not touch.is_pressed and theta() < 40:
+    while touch.is_released and theta() < 40:
         start = time.time()
 
         prev_state = cur_state
@@ -75,6 +75,7 @@ def balance():
     print("mean dt", dt_sum / n_iter)
 
 def main():
+    os.system("setfont Lat15-Terminus24x12")
     print("calibrate ready")
     touch.wait_for_pressed()
     touch.wait_for_released()
